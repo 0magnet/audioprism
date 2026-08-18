@@ -11,8 +11,22 @@ of it and needs a working reference to check itself against: rendering a WAV to
 an image is the only way to compare two spectrograms on identical input, and
 that path was broken.
 
-Three fixes, each verified against an independent renderer of the same file:
+Six fixes, each verified against an independent renderer of the same file.
+With all of them in, the two programs agree pixel for pixel — worst channel
+difference 0 — across 43 of 44 combinations of color scheme, window function,
+DFT size, overlap, orientation, image size and magnitude window. The one
+exception is grayscale with a Hamming window, which differs by 1/255 on a
+handful of pixels because this program computes its window in `float` and the
+port computes it in `double`.
 
+* **`--overlap` never worked at any value but 50.** The window is advanced one
+  hop at a time, keeping the samples the next window shares with this one; both
+  the real-time and file paths moved a hop's worth from the overlap offset
+  instead of an overlap's worth from the hop offset. Those are the same thing at
+  50% and nothing else, so the default hid it. At `--overlap 90` a rendered file
+  came out almost entirely black. The real-time path also consumed the wrong
+  number of samples per column, advancing the display at the wrong rate through
+  audio it was partly discarding.
 * **Color file renders were corrupt.** Every WAV rendered in color came out as
   four pure colors — black, blue, green and red, a quarter of the pixels each,
   cycling with a period of four — because a packed `0x00RRGGBB` buffer was
@@ -20,10 +34,18 @@ Three fixes, each verified against an independent renderer of the same file:
   three channels all carry the same byte. Now unpacked to explicit RGB.
 * **`--magnitude-max` did nothing.** The option dispatch tested for
   `"magntiude-max"`, so the value was silently dropped and every render used the
-  default of 50. Present in the released binary too.
+  default. Present in the released binary too.
+* **Linear magnitude limits were checked against the logarithmic ones.**
+  `--magnitude-scale linear --magnitude-max 500` was refused for exceeding 80
+  and told the user the limit was 1000 — both numbers appear in the message and
+  neither was the one applied. A linear minimum was meanwhile accepted down
+  to -80.
 * **The first column was half silence.** The first DFT ran before the overlap
   window had filled, so the first column of every render was the transform of a
   step out of silence, and every column after it was one hop out of place.
+* **`--help` misreported its own default.** It advertises a default
+  `--magnitude-max` of 50.0; `Configuration.hpp` starts at 45.0, and the 50.0 is
+  a separate field that only the `l` key restores.
 
 Everything else is upstream's.
 
@@ -97,7 +119,7 @@ Spectrogram Settings
     --magnitude-scale <scale>   Magnitude Scale [linear, logarithmic]
                                     (default logarithmic)
     --magnitude-min <value>     Magnitude Minimum (default 0.0)
-    --magnitude-max <value>     Magnitude Maximum (default 50.0)
+    --magnitude-max <value>     Magnitude Maximum (default 45.0)
     --colors <color scheme>     Color Scheme [heat, blue, grayscale]
                                     (default heat)
 
