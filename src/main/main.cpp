@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <getopt.h>
 
@@ -55,6 +56,26 @@ void spectrogram_audiofile(std::string audioPath, std::string imagePath) {
 
     /* Overlapped Samples */
     std::vector<float> overlapSamples(InitialSettings.dftSize);
+    /* Fill the window before transforming anything.
+     *
+     * The loop below shifts the window down by one hop and appends one hop of
+     * new audio, so on its first pass it transformed a window that was still
+     * half the zeros it was constructed with. That step from silence to signal
+     * is a discontinuity, and a discontinuity is broadband: the first column of
+     * every rendered file is an artifact of it rather than a spectrum of
+     * anything. Every column after it is also one hop later than it should be.
+     *
+     * Reading one hop up front costs one hop of audio and makes column n cover
+     * the samples column n is supposed to cover. */
+    {
+        std::vector<float> primer(overlapSamples.size() - samplesOverlap);
+        audioSource.read(primer);
+        if (primer.size() > 0) {
+            primer.resize(overlapSamples.size() - samplesOverlap);
+            std::memcpy(overlapSamples.data() + samplesOverlap, primer.data(),
+                        sizeof(float) * (overlapSamples.size() - samplesOverlap));
+        }
+    }
     /* DFT of Overlapped Samples */
     std::vector<std::complex<float>> dftSamples(InitialSettings.dftSize / 2 + 1);
     /* Pixel line */
