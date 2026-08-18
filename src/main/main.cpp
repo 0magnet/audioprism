@@ -59,21 +59,26 @@ void spectrogram_audiofile(std::string audioPath, std::string imagePath) {
     /* Fill the window before transforming anything.
      *
      * The loop below shifts the window down by one hop and appends one hop of
-     * new audio, so on its first pass it transformed a window that was still
-     * half the zeros it was constructed with. That step from silence to signal
-     * is a discontinuity, and a discontinuity is broadband: the first column of
-     * every rendered file is an artifact of it rather than a spectrum of
-     * anything. Every column after it is also one hop later than it should be.
+     * new audio, so left to itself its first pass transforms a window that is
+     * still mostly the zeros it was constructed with. That step from silence to
+     * signal is a discontinuity, and a discontinuity is broadband: the opening
+     * columns of every rendered file are an artifact of it rather than a
+     * spectrum of anything, and every column after them is late by however long
+     * the window took to fill.
      *
-     * Reading one hop up front costs one hop of audio and makes column n cover
-     * the samples column n is supposed to cover. */
+     * How long that is depends on the overlap — a window is filled a hop at a
+     * time, and at 90% overlap a hop is a tenth of one — so the priming read is
+     * of samplesOverlap samples, placed one hop in. Whatever the overlap, the
+     * loop's first pass then shifts exactly this audio down to the front and
+     * appends the hop that follows it, and column zero covers samples zero
+     * through N. */
     {
-        std::vector<float> primer(overlapSamples.size() - samplesOverlap);
+        std::vector<float> primer(samplesOverlap);
         audioSource.read(primer);
         if (primer.size() > 0) {
-            primer.resize(overlapSamples.size() - samplesOverlap);
-            std::memcpy(overlapSamples.data() + samplesOverlap, primer.data(),
-                        sizeof(float) * (overlapSamples.size() - samplesOverlap));
+            primer.resize(samplesOverlap);
+            std::memcpy(overlapSamples.data() + (overlapSamples.size() - samplesOverlap),
+                        primer.data(), sizeof(float) * samplesOverlap);
         }
     }
     /* DFT of Overlapped Samples */
@@ -93,10 +98,21 @@ void spectrogram_audiofile(std::string audioPath, std::string imagePath) {
         if (audioSamples.size() < (overlapSamples.size() - samplesOverlap))
             audioSamples.resize(overlapSamples.size() - samplesOverlap);
 
-        /* Move down overlapSamples.size()-samplesOverlap length old samples */
-        memmove(overlapSamples.data(), overlapSamples.data() + samplesOverlap, sizeof(float) * (overlapSamples.size() - samplesOverlap));
-        /* Copy overlapSamples.size()-samplesOverlap length new samples */
-        memcpy(overlapSamples.data() + samplesOverlap, audioSamples.data(), sizeof(float) * (overlapSamples.size() - samplesOverlap));
+        /* Slide the window down by one hop, keeping the samplesOverlap samples
+         * that the next window shares with this one, then append the hop of new
+         * audio after them.
+         *
+         * The move is of samplesOverlap samples starting one hop in — not of a
+         * hop's worth starting samplesOverlap in. Those two are the same thing
+         * at 50% overlap, where the hop and the overlap are both half a window,
+         * and at nothing else. Away from 50% the old form kept the wrong part
+         * of the window and left the rest holding whatever the previous
+         * iteration had put there, so --overlap did not so much change the
+         * resolution as fill the window with stale audio: at 90% the picture
+         * came out almost entirely black. */
+        const unsigned int hop = static_cast<unsigned int>(overlapSamples.size()) - samplesOverlap;
+        memmove(overlapSamples.data(), overlapSamples.data() + hop, sizeof(float) * samplesOverlap);
+        memcpy(overlapSamples.data() + samplesOverlap, audioSamples.data(), sizeof(float) * hop);
 
         /* Compute DFT */
         realDft.compute(dftSamples, overlapSamples);
