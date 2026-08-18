@@ -137,7 +137,7 @@ void print_usage(std::string progname) {
                              "    --magnitude-scale <scale>   Magnitude Scale [linear, logarithmic]\n"
                              "                                    (default logarithmic)\n"
                              "    --magnitude-min <value>     Magnitude Minimum (default 0.0)\n"
-                             "    --magnitude-max <value>     Magnitude Maximum (default 50.0)\n"
+                             "    --magnitude-max <value>     Magnitude Maximum (default 45.0)\n"
                              "    --colors <color scheme>     Color Scheme [heat, blue, grayscale]\n"
                              "                                    (default heat)\n"
                              "\n"
