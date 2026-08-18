@@ -54,16 +54,30 @@ void SpectrogramThread::_run() {
                 dftSamples.resize(_realDft.getSize() / 2 + 1);
             }
 
-            /* If we don't have enough samples to update overlap window, continue to pop more */
-            if (audioSamples.size() < _samplesOverlap)
+            /* One hop of new audio advances the window by one column, so that
+             * is what we wait for, what we consume, and what we append. The
+             * remaining _samplesOverlap samples are the part this window shares
+             * with the last one, and they move down from one hop in.
+             *
+             * All three counts used to be the other quantity: it waited for and
+             * consumed _samplesOverlap samples per column while only ever
+             * appending a hop of them, and it moved the wrong part of the
+             * window down. At 50% overlap the hop and the overlap are equal and
+             * none of it shows. Away from 50% it advanced the display at the
+             * wrong rate through audio it was partly discarding, over a window
+             * left holding stale samples. */
+            const unsigned int hop = static_cast<unsigned int>(overlapSamples.size()) - _samplesOverlap;
+
+            /* If we don't have a hop's worth of samples yet, pop more */
+            if (audioSamples.size() < hop)
                 continue;
 
-            /* Move down overlapSamples.size()-samplesOverlap length old samples */
-            memmove(overlapSamples.data(), overlapSamples.data() + _samplesOverlap, sizeof(float) * (overlapSamples.size() - _samplesOverlap));
-            /* Copy overlapSamples.size()-samplesOverlap length new samples */
-            memcpy(overlapSamples.data() + _samplesOverlap, audioSamples.data(), sizeof(float) * (overlapSamples.size() - _samplesOverlap));
+            /* Move down the samples this window shares with the last one */
+            memmove(overlapSamples.data(), overlapSamples.data() + hop, sizeof(float) * _samplesOverlap);
+            /* Append one hop of new samples */
+            memcpy(overlapSamples.data() + _samplesOverlap, audioSamples.data(), sizeof(float) * hop);
             /* Erase used audio samples */
-            audioSamples.erase(audioSamples.begin(), audioSamples.begin() + _samplesOverlap);
+            audioSamples.erase(audioSamples.begin(), audioSamples.begin() + hop);
 
             /* Compute DFT */
             _realDft.compute(dftSamples, overlapSamples);
