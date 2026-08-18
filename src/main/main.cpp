@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
                     print_usage(argv[0]);
                     return EXIT_FAILURE;
                 }
-            } else if (option_name == "magntiude-max") {
+            } else if (option_name == "magnitude-max") {
                 try {
                     InitialSettings.magnitudeMax = std::stof(option_arg);
                 } catch (const std::invalid_argument &e) {
