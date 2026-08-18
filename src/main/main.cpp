@@ -362,11 +362,19 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
     } else {
-        if (InitialSettings.magnitudeMin < UserLimits.magnitudeLogMin) {
+        /* Against the LINEAR limits, which is the branch this is.
+         *
+         * Both comparisons here read magnitudeLog* while both messages print
+         * magnitudeLinear*, so the check and its explanation disagreed. In
+         * linear mode a maximum of 500 — comfortably inside the documented
+         * range — was refused for exceeding 80, and the refusal told the user
+         * the limit was 1000. In the other direction a negative minimum was
+         * accepted, down to -80, which a linear magnitude cannot be. */
+        if (InitialSettings.magnitudeMin < UserLimits.magnitudeLinearMin) {
             std::cout << "Invalid magnitude min (must be >= " << UserLimits.magnitudeLinearMin << ").\n\n";
             print_usage(argv[0]);
             return EXIT_FAILURE;
-        } else if (InitialSettings.magnitudeMax > UserLimits.magnitudeLogMax) {
+        } else if (InitialSettings.magnitudeMax > UserLimits.magnitudeLinearMax) {
             std::cout << "Invalid magnitude max (must be <= " << UserLimits.magnitudeLinearMax << ").\n\n";
             print_usage(argv[0]);
             return EXIT_FAILURE;
