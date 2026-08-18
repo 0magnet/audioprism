@@ -2,6 +2,31 @@
 
 audioprism is a spectrogram tool for PulseAudio and WAV files.
 
+## About this fork
+
+A fork of [vsergeev/audioprism](https://github.com/vsergeev/audioprism), which
+has been dormant since July 2023 and has never had a pull request. It is kept
+here because [audioprism-go](https://github.com/0magnet/audioprism-go) is a port
+of it and needs a working reference to check itself against: rendering a WAV to
+an image is the only way to compare two spectrograms on identical input, and
+that path was broken.
+
+Three fixes, each verified against an independent renderer of the same file:
+
+* **Color file renders were corrupt.** Every WAV rendered in color came out as
+  four pure colors — black, blue, green and red, a quarter of the pixels each,
+  cycling with a period of four — because a packed `0x00RRGGBB` buffer was
+  handed to GraphicsMagick as `"BGRA"`. Grayscale hid it completely, since its
+  three channels all carry the same byte. Now unpacked to explicit RGB.
+* **`--magnitude-max` did nothing.** The option dispatch tested for
+  `"magntiude-max"`, so the value was silently dropped and every render used the
+  default of 50. Present in the released binary too.
+* **The first column was half silence.** The first DFT ran before the overlap
+  window had filled, so the first column of every render was the transform of a
+  step out of silence, and every column after it was one hop out of place.
+
+Everything else is upstream's.
+
 ## Examples
 
 **Music**
